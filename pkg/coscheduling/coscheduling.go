@@ -60,7 +60,7 @@ const (
 )
 
 // New initializes and returns a new Coscheduling plugin.
-func New(obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+func New(_ context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 	args, ok := obj.(*config.CoschedulingArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type CoschedulingArgs, got %T", obj)
@@ -102,13 +102,13 @@ func New(obj runtime.Object, handle framework.Handle) (framework.Plugin, error) 
 	return plugin, nil
 }
 
-func (cs *Coscheduling) EventsToRegister() []framework.ClusterEvent {
+func (cs *Coscheduling) EventsToRegister() []framework.ClusterEventWithHint {
 	// To register a custom event, follow the naming convention at:
 	// https://git.k8s.io/kubernetes/pkg/scheduler/eventhandlers.go#L403-L410
 	pgGVK := fmt.Sprintf("podgroups.v1alpha1.%v", scheduling.GroupName)
-	return []framework.ClusterEvent{
-		{Resource: framework.Pod, ActionType: framework.Add},
-		{Resource: framework.GVK(pgGVK), ActionType: framework.Add | framework.Update},
+	return []framework.ClusterEventWithHint{
+		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Add}},
+		{Event: framework.ClusterEvent{Resource: framework.GVK(pgGVK), ActionType: framework.Add | framework.Update}},
 	}
 }
 
@@ -204,7 +204,7 @@ func (cs *Coscheduling) PreFilterExtensions() framework.PreFilterExtensions {
 // Permit is the functions invoked by the framework at "Permit" extension point.
 func (cs *Coscheduling) Permit(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (*framework.Status, time.Duration) {
 	waitTime := *cs.scheduleTimeout
-	s := cs.pgMgr.Permit(ctx, pod)
+	s := cs.pgMgr.Permit(ctx, state, pod)
 	var retStatus *framework.Status
 	switch s {
 	case core.PodGroupNotSpecified:

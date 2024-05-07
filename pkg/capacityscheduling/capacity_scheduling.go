@@ -118,7 +118,7 @@ func (c *CapacityScheduling) Name() string {
 }
 
 // New initializes a new plugin and returns it.
-func New(obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+func New(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 	c := &CapacityScheduling{
 		fh:                handle,
 		elasticQuotaInfos: NewElasticQuotaInfos(),
@@ -136,8 +136,8 @@ func New(obj runtime.Object, handle framework.Handle) (framework.Plugin, error) 
 	if err != nil {
 		return nil, err
 	}
-	// TODO: pass in context.
-	elasticQuotaInformer, err := dynamicCache.GetInformer(context.Background(), &v1alpha1.ElasticQuota{})
+
+	elasticQuotaInformer, err := dynamicCache.GetInformer(ctx, &v1alpha1.ElasticQuota{})
 	if err != nil {
 		return nil, err
 	}
@@ -191,13 +191,13 @@ func New(obj runtime.Object, handle framework.Handle) (framework.Plugin, error) 
 	return c, nil
 }
 
-func (c *CapacityScheduling) EventsToRegister() []framework.ClusterEvent {
+func (c *CapacityScheduling) EventsToRegister() []framework.ClusterEventWithHint {
 	// To register a custom event, follow the naming convention at:
 	// https://git.k8s.io/kubernetes/pkg/scheduler/eventhandlers.go#L403-L410
 	eqGVK := fmt.Sprintf("elasticquotas.v1alpha1.%v", scheduling.GroupName)
-	return []framework.ClusterEvent{
-		{Resource: framework.Pod, ActionType: framework.Delete},
-		{Resource: framework.GVK(eqGVK), ActionType: framework.All},
+	return []framework.ClusterEventWithHint{
+		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}},
+		{Event: framework.ClusterEvent{Resource: framework.GVK(eqGVK), ActionType: framework.All}},
 	}
 }
 
@@ -376,6 +376,10 @@ type preemptor struct {
 	state *framework.CycleState
 }
 
+func (p *preemptor) OrderedScoreFuncs(ctx context.Context, nodesToVictims map[string]*extenderv1.Victims) []func(node string) int64 {
+	return nil
+}
+
 func (p *preemptor) GetOffsetAndNumCandidates(n int32) (int32, int32) {
 	return 0, n
 }
@@ -493,8 +497,9 @@ func (p *preemptor) SelectVictimsOnNode(
 	var nominatedPodsReqWithPodReq framework.Resource
 	podReq := preFilterState.podReq
 
+	logger := klog.FromContext(ctx)
 	removePod := func(rpi *framework.PodInfo) error {
-		if err := nodeInfo.RemovePod(rpi.Pod); err != nil {
+		if err := nodeInfo.RemovePod(logger, rpi.Pod); err != nil {
 			return err
 		}
 		status := p.fh.RunPreFilterExtensionRemovePod(ctx, state, pod, rpi, nodeInfo)

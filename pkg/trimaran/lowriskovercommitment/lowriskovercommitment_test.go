@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 
 	pluginConfig "sigs.k8s.io/scheduler-plugins/apis/config"
 	"sigs.k8s.io/scheduler-plugins/pkg/trimaran"
@@ -80,6 +81,9 @@ func TestLowRiskOverCommitment_New(t *testing.T) {
 	}))
 	defer server.Close()
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	lowRiskOverCommitmentArgs := pluginConfig.LowRiskOverCommitmentArgs{
 		TrimaranSpec:        pluginConfig.TrimaranSpec{WatcherAddress: server.URL},
 		SmoothingWindowSize: 5,
@@ -94,21 +98,21 @@ func TestLowRiskOverCommitment_New(t *testing.T) {
 		Args: &lowRiskOverCommitmentArgs,
 	}
 
-	registeredPlugins := []st.RegisterPluginFunc{
-		st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-		st.RegisterPreScorePlugin(Name, New),
-		st.RegisterScorePlugin(Name, New, 1),
+	registeredPlugins := []tf.RegisterPluginFunc{
+		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		tf.RegisterPreScorePlugin(Name, New),
+		tf.RegisterScorePlugin(Name, New, 1),
 	}
 
 	cs := testClientSet.NewSimpleClientset()
 	informerFactory := informers.NewSharedInformerFactory(cs, 0)
 	snapshot := newTestSharedLister(nil, nil)
-	fh, err := testutil.NewFramework(registeredPlugins, []schedConfig.PluginConfig{lowRiskOverCommitmentConfig},
+	fh, err := testutil.NewFramework(ctx, registeredPlugins, []schedConfig.PluginConfig{lowRiskOverCommitmentConfig},
 		"default-scheduler", runtime.WithClientSet(cs),
 		runtime.WithInformerFactory(informerFactory), runtime.WithSnapshotSharedLister(snapshot))
 	assert.Nil(t, err)
-	p, err := New(&lowRiskOverCommitmentArgs, fh)
+	p, err := New(ctx, &lowRiskOverCommitmentArgs, fh)
 	assert.NotNil(t, p)
 	assert.Nil(t, err)
 
@@ -117,12 +121,12 @@ func TestLowRiskOverCommitment_New(t *testing.T) {
 		TrimaranSpec:        pluginConfig.TrimaranSpec{WatcherAddress: server.URL},
 		SmoothingWindowSize: -5,
 	}
-	badp, err := New(&badArgs, fh)
+	badp, err := New(ctx, &badArgs, fh)
 	assert.NotNil(t, badp)
 	assert.Nil(t, err)
 
 	badArgs.RiskLimitWeights = nil
-	badp, err = New(&badArgs, fh)
+	badp, err = New(ctx, &badArgs, fh)
 	assert.NotNil(t, badp)
 	assert.Nil(t, err)
 }
@@ -169,9 +173,9 @@ func TestLowRiskOverCommitment_Score(t *testing.T) {
 		},
 	}
 
-	registeredPlugins := []st.RegisterPluginFunc{
-		st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+	registeredPlugins := []tf.RegisterPluginFunc{
+		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 	}
 
 	for _, tt := range tests {
@@ -182,6 +186,9 @@ func TestLowRiskOverCommitment_Score(t *testing.T) {
 				resp.Write(bytes)
 			}))
 			defer server.Close()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
 			nodes := append([]*v1.Node{}, tt.nodes...)
 			state := framework.NewCycleState()
@@ -203,11 +210,11 @@ func TestLowRiskOverCommitment_Score(t *testing.T) {
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			snapshot := newTestSharedLister(nil, nodes)
 
-			fh, err := testutil.NewFramework(registeredPlugins, []schedConfig.PluginConfig{LowRiskOverCommitmentConfig},
+			fh, err := testutil.NewFramework(ctx, registeredPlugins, []schedConfig.PluginConfig{LowRiskOverCommitmentConfig},
 				"default-scheduler", runtime.WithClientSet(cs),
 				runtime.WithInformerFactory(informerFactory), runtime.WithSnapshotSharedLister(snapshot))
 			assert.Nil(t, err)
-			p, _ := New(&lowRiskOverCommitmentArgs, fh)
+			p, _ := New(ctx, &lowRiskOverCommitmentArgs, fh)
 
 			preScorePlugin := p.(framework.PreScorePlugin)
 			status := preScorePlugin.PreScore(context.Background(), state, tt.pod, tt.nodes)

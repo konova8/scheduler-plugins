@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	schedruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -511,7 +512,8 @@ func BenchmarkNetworkOverheadPreFilter(b *testing.B) {
 			client := builder.Build()
 
 			// create plugin
-			ctx := context.Background()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
 			snapshot := newTestSharedLister(nil, nodes)
 
@@ -527,12 +529,12 @@ func BenchmarkNetworkOverheadPreFilter(b *testing.B) {
 				}
 			}
 
-			registeredPlugins := []st.RegisterPluginFunc{
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+			registeredPlugins := []tf.RegisterPluginFunc{
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 			}
 
-			fh, _ := st.NewFramework(registeredPlugins, "default-scheduler", ctx.Done(), schedruntime.WithClientSet(cs),
+			fh, _ := tf.NewFramework(ctx, registeredPlugins, "default-scheduler", schedruntime.WithClientSet(cs),
 				schedruntime.WithInformerFactory(informerFactory), schedruntime.WithSnapshotSharedLister(snapshot))
 
 			pl := &NetworkOverhead{
@@ -747,12 +749,12 @@ func TestNetworkOverheadScore(t *testing.T) {
 				}
 			}
 
-			registeredPlugins := []st.RegisterPluginFunc{
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+			registeredPlugins := []tf.RegisterPluginFunc{
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 			}
 
-			fh, _ := st.NewFramework(registeredPlugins, "default-scheduler", ctx.Done(), schedruntime.WithClientSet(cs),
+			fh, _ := tf.NewFramework(ctx, registeredPlugins, "default-scheduler", schedruntime.WithClientSet(cs),
 				schedruntime.WithInformerFactory(informerFactory), schedruntime.WithSnapshotSharedLister(snapshot))
 
 			pl := &NetworkOverhead{
@@ -994,12 +996,12 @@ func BenchmarkNetworkOverheadScore(b *testing.B) {
 				}
 			}
 
-			registeredPlugins := []st.RegisterPluginFunc{
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+			registeredPlugins := []tf.RegisterPluginFunc{
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 			}
 
-			fh, _ := st.NewFramework(registeredPlugins, "default-scheduler", ctx.Done(), schedruntime.WithClientSet(cs),
+			fh, _ := tf.NewFramework(ctx, registeredPlugins, "default-scheduler", schedruntime.WithClientSet(cs),
 				schedruntime.WithInformerFactory(informerFactory), schedruntime.WithSnapshotSharedLister(snapshot))
 
 			pl := &NetworkOverhead{
@@ -1223,12 +1225,12 @@ func TestNetworkOverheadFilter(t *testing.T) {
 				}
 			}
 
-			registeredPlugins := []st.RegisterPluginFunc{
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+			registeredPlugins := []tf.RegisterPluginFunc{
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 			}
 
-			fh, _ := st.NewFramework(registeredPlugins, "default-scheduler", ctx.Done(),
+			fh, _ := tf.NewFramework(ctx, registeredPlugins, "default-scheduler",
 				schedruntime.WithClientSet(cs),
 				schedruntime.WithInformerFactory(informerFactory),
 				schedruntime.WithSnapshotSharedLister(snapshot))
@@ -1449,12 +1451,12 @@ func BenchmarkNetworkOverheadFilter(b *testing.B) {
 				}
 			}
 
-			registeredPlugins := []st.RegisterPluginFunc{
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+			registeredPlugins := []tf.RegisterPluginFunc{
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 			}
 
-			fh, _ := st.NewFramework(registeredPlugins, "default-scheduler", ctx.Done(),
+			fh, _ := tf.NewFramework(ctx, registeredPlugins, "default-scheduler",
 				schedruntime.WithClientSet(cs),
 				schedruntime.WithInformerFactory(informerFactory),
 				schedruntime.WithSnapshotSharedLister(snapshot))
